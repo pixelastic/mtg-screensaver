@@ -1,0 +1,53 @@
+#!/usr/bin/env zsh
+# Fetch a random MTG card art in high resolution and display it
+# Uses Scryfall API for card data, mtgpics.com for high-res art
+# Usage:
+# $ ./scripts/random
+set -e
+
+SCRYFALL_URL="https://api.scryfall.com/cards/random?q=year%3E%3D2024+is%3Ahighres"
+TMPFILE="/tmp/mtg-screensaver-art.jpg"
+
+# Fetch random card from Scryfall
+local cardJson="/tmp/mtg-screensaver-card.json"
+curl \
+  --silent \
+  --header "User-Agent: mtg-screensaver/1.0" \
+  --output "$cardJson" \
+  "$SCRYFALL_URL"
+
+local cardName="$(jq -r '.name' "$cardJson")"
+local cardSet="$(jq -r '.set' "$cardJson")"
+local collectorNumber="$(jq -r '.collector_number' "$cardJson")"
+local scryfallArt="$(jq -r '.image_uris.art_crop' "$cardJson")"
+
+# Stop if Scryfall returned no data
+[[ "$cardName" == "" || "$cardName" == "null" ]] && echo "No card found" && exit 1
+
+local paddedNumber="$(printf '%03d' "$collectorNumber" 2>/dev/null || echo "$collectorNumber")"
+local mtgpicsUrl="https://www.mtgpics.com/pics/art/${cardSet}/${paddedNumber}.jpg"
+
+echo "$cardName ($cardSet #$collectorNumber)"
+
+# Try mtgpics first for high-res art
+curl \
+  --silent \
+  --location \
+  --header "User-Agent: Mozilla/5.0" \
+  --header "Referer: https://www.mtgpics.com/" \
+  --output "$TMPFILE" \
+  "$mtgpicsUrl"
+
+# Fallback to Scryfall art_crop if mtgpics returned empty/invalid
+local fileSize="$(wc -c < "$TMPFILE" | tr -d ' ')"
+if [[ "$fileSize" -lt 1000 ]]; then
+  echo "mtgpics unavailable, falling back to Scryfall"
+  curl \
+    --silent \
+    --location \
+    --header "User-Agent: mtg-screensaver/1.0" \
+    --output "$TMPFILE" \
+    "$scryfallArt"
+fi
+
+better-cat "$TMPFILE"
