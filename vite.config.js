@@ -1,5 +1,7 @@
-import config from 'aberlaas/configs/vite';
+import vue from '@vitejs/plugin-vue';
+// eslint-disable-next-line import/no-unresolved
+import { defineConfig } from 'vite';
 
-export default {
-  ...config,
-};
+export default defineConfig({
+  plugins: [vue()],
+});
